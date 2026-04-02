@@ -327,6 +327,7 @@ def main(args):
     # =========================
     sample_responses = []
     iscorr_list = []
+    round_accs = 0
 
     for idx, (x, y) in tqdm(enumerate(zip(test_X, test_Y)), total=len(test_X)):
         print('\n\nQuestion: ', x + SUFFIX, '\n')
@@ -543,8 +544,8 @@ if __name__ == "__main__":
 
     args.timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
-    with open('token', 'r') as f:
-        token = f.read().strip()
-    args.token = token
+    #with open('token', 'r') as f:
+    #    token = f.read().strip()
+    #args.token = token
 
     main(args)

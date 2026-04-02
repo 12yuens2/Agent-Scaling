@@ -22,7 +22,7 @@ class AzureOpenAIWrapper:
         model_name: str,
         azure_endpoint: str,
         api_key: str,
-        api_version: str = "2025-04-01-preview",
+        api_version: str = "2025-01-01-preview",
         timeout: Optional[float] = None,
     ):
         self.model_name = model_name
@@ -33,17 +33,17 @@ class AzureOpenAIWrapper:
 
         try:
             # openai>=1.0 provides AzureOpenAI
-            from openai import AzureOpenAI  # type: ignore
+            from openai import OpenAI  # type: ignore
         except Exception as e:
             raise ImportError(
                 "AzureOpenAIWrapper requires the official OpenAI Python SDK. "
                 "Install with: pip install 'openai>=1.0.0'"
             ) from e
 
-        self._client = AzureOpenAI(
-            azure_endpoint=self.azure_endpoint,
+        self._client = OpenAI(
+            base_url=self.azure_endpoint,
             api_key=self.api_key,
-            api_version=self.api_version,
+            #api_version=self.api_version,
         )
 
     def complete(
@@ -59,13 +59,14 @@ class AzureOpenAIWrapper:
         `messages` follows the OpenAI chat format:
           [{"role": "system"|"user"|"assistant", "content": "..."}, ...]
         """
+        print(f"MAX TOKENS:{max_tokens}")
 
         resp = self._client.chat.completions.create(
             model=self.model_name,
             messages=messages,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            top_p=top_p,
+            max_completion_tokens=max_tokens,
+            #temperature=temperature,
+            #top_p=top_p,
             **kwargs,
         )
         return resp.choices[0].message.content or ""
