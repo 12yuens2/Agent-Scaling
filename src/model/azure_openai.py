@@ -45,6 +45,26 @@ class AzureOpenAIWrapper:
             api_key=self.api_key,
             #api_version=self.api_version,
         )
+        
+    def chat_completion(self, messages, max_tokens, temperature, top_p, **kwargs):
+        if self.model_name == "o3-mini":
+            return self._client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+                max_completion_tokens=max_tokens,
+                temperature=temperature,
+                #top_p=top_p,
+                **kwargs
+            )
+        else:
+            return self._client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+                max_completion_tokens=max_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                **kwargs
+            )
 
     def complete(
         self,
@@ -64,14 +84,7 @@ class AzureOpenAIWrapper:
         max_tokens_try = max_tokens
         while max_tokens_try <= MAX_RETRY_TOKENS:
             try:
-                resp = self._client.chat.completions.create(
-                    model=self.model_name,
-                    messages=messages,
-                    max_completion_tokens=max_tokens_try,
-                    #temperature=temperature,
-                    #top_p=top_p,
-                    **kwargs,
-                )
+                resp = self.chat_completion(messages, max_tokens_try, temperature, top_p, **kwargs)
                 break
             except BadRequestError as e:
                 if "Insufficient tokens to fulfill request" in str(e): #not enough tokens
