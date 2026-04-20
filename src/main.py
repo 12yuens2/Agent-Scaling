@@ -35,12 +35,12 @@ def get_args():
     parser.add_argument('--data_dir', type=str, default="./data/")
     parser.add_argument('--data', type=str, default='')
     parser.add_argument('--sub_data', type=str, default='')
-    parser.add_argument('--data_size', type=int, default=0)
+    parser.add_argument('--data_size', type=int, default=100)
     parser.add_argument('--split', type=str, default='train')
     parser.add_argument('--debug', action='store_true')
 
     # agent
-    parser.add_argument('--num_agents', type=int, default=5)
+    parser.add_argument('--num_agents', type=int, default=4)
     parser.add_argument('--agent_selection', type=str, default="none")
     parser.add_argument('--multi_persona', action='store_true')
     parser.add_argument('--baseline_a', action='store_true',
@@ -89,6 +89,8 @@ def get_args():
     parser.add_argument('--alpha', type=float, default=0.0)
     parser.add_argument('--bae', action='store_true')
     parser.add_argument('--cot', action='store_true')
+
+    parser.add_argument('--token', type=str)
 
     return parser.parse_args()
 
@@ -327,7 +329,7 @@ def main(args):
     # =========================
     sample_responses = []
     iscorr_list = []
-
+    print("Data ",args.data)
     for idx, (x, y) in tqdm(enumerate(zip(test_X, test_Y)), total=len(test_X)):
         print('\n\nQuestion: ', x + SUFFIX, '\n')
 
@@ -407,84 +409,27 @@ def main(args):
         # ============================================================
         # First round inference - pass persona_configs
         # ============================================================
-        responses = engine(messages, agents, args.num_agents, persona_configs=persona_configs)
-        agent_responses = dict(zip(agent_names, responses))
-
-        # Verbose: print per-agent generation parameters
-        if args.verbose:
-            print("\n[Round 0] Agent generation configs:")
-            for name, cfg in zip(agent_names, persona_configs):
-                if cfg:
-                    print(f"  {name}: temp={cfg.get('temperature')}, top_p={cfg.get('top_p')}")
-                else:
-                    print(f"  {name}: using default params")
-
-        # evaluate
-        if args.centralized:
-            central_agent_response = {list(agent_responses.keys())[0]: list(agent_responses.values())[0]}
-            final_resps, debate_resps, is_corr = evaluate(central_agent_response, y)
-        else:
-            final_resps, debate_resps, is_corr = evaluate(agent_responses, y)
-
-        print(f"ROUND 0 : {final_resps} (answer = {y})")
-
-        if args.data in ['gsm8k']:
-            round_data = {
-                'responses': agent_responses,
-                'final_answers': final_resps,
-                'final_answer_iscorr': [y_pred == np.round(y, 1) for y_pred in final_resps],
-                'debate_answer': debate_resps,
-                'debate_answer_iscorr': is_corr,
-                'answer': np.round(y, 1),
-                'persona_configs': [str(c) for c in persona_configs]
-            }
-        else:
-            round_data = {
-                'responses': agent_responses,
-                'final_answers': final_resps,
-                'final_answer_iscorr': [y_pred == y for y_pred in final_resps],
-                'debate_answer': debate_resps,
-                'debate_answer_iscorr': is_corr,
-                'answer': y,
-                'persona_configs': [str(c) for c in persona_configs]
-            }
-
-        rounds_data_dict = {'0': round_data}
-        round_iscorr.append(is_corr)
-
-        # ============================================================
-        # Debate rounds
-        # ============================================================
-        for r in range(1, args.debate_rounds + 1):
-            print(f"Debating round {r}...")
-
-            if args.multi_persona or getattr(args, "baseline_b", False):
-                new_agent_messages, persona_configs = get_new_message(
-                    args, x, agent_responses, personas, suffix=SUFFIX
-                )
-            else:
-                new_agent_messages, persona_configs = get_new_message(
-                    args, x, agent_responses, suffix=SUFFIX
-                )
-
-            messages = list(new_agent_messages.values())
+        try: 
             responses = engine(messages, agents, args.num_agents, persona_configs=persona_configs)
             agent_responses = dict(zip(agent_names, responses))
 
+            # Verbose: print per-agent generation parameters
             if args.verbose:
-                print(f"\n[Round {r}] Agent generation configs:")
+                print("\n[Round 0] Agent generation configs:")
                 for name, cfg in zip(agent_names, persona_configs):
                     if cfg:
                         print(f"  {name}: temp={cfg.get('temperature')}, top_p={cfg.get('top_p')}")
+                    else:
+                        print(f"  {name}: using default params")
 
+            # evaluate
             if args.centralized:
                 central_agent_response = {list(agent_responses.keys())[0]: list(agent_responses.values())[0]}
                 final_resps, debate_resps, is_corr = evaluate(central_agent_response, y)
             else:
                 final_resps, debate_resps, is_corr = evaluate(agent_responses, y)
 
-            print("\n\n" + str(messages[0])[:200] + "...\n\n")
-            print(f"ROUND {r} : {final_resps} (answer = {y})")
+            print(f"ROUND 0 : {final_resps} (answer = {y})")
 
             if args.data in ['gsm8k']:
                 round_data = {
@@ -507,23 +452,89 @@ def main(args):
                     'persona_configs': [str(c) for c in persona_configs]
                 }
 
-            rounds_data_dict[str(r)] = round_data
+            rounds_data_dict = {'0': round_data}
             round_iscorr.append(is_corr)
 
-        sample_responses.append(rounds_data_dict)
-        iscorr_list.append(round_iscorr)
+            # ============================================================
+            # Debate rounds
+            # ============================================================
+            for r in range(1, args.debate_rounds + 1):
+                print(f"Debating round {r}...")
 
-        # Save
-        history_dir = os.path.join(args.out_dir, "history")
-        os.makedirs(history_dir, exist_ok=True)
-        out_path = os.path.join(history_dir, f"{fname}.jsonl")
-        with open(out_path, "w") as f:
-            for record in sample_responses:
-                f.write(json.dumps(record, default=convert_numpy) + "\n")
+                if args.multi_persona or getattr(args, "baseline_b", False):
+                    new_agent_messages, persona_configs = get_new_message(
+                        args, x, agent_responses, personas, suffix=SUFFIX
+                    )
+                else:
+                    new_agent_messages, persona_configs = get_new_message(
+                        args, x, agent_responses, suffix=SUFFIX
+                    )
 
-        round_accs = np.array(iscorr_list).mean(0)
-        for i, acc in enumerate(round_accs):
-            print(f'Round {i} Acc.: {acc:.4f}')
+                messages = list(new_agent_messages.values())
+                responses = engine(messages, agents, args.num_agents, persona_configs=persona_configs)
+                agent_responses = dict(zip(agent_names, responses))
+
+                if args.verbose:
+                    print(f"\n[Round {r}] Agent generation configs:")
+                    for name, cfg in zip(agent_names, persona_configs):
+                        if cfg:
+                            print(f"  {name}: temp={cfg.get('temperature')}, top_p={cfg.get('top_p')}")
+
+                if args.centralized:
+                    central_agent_response = {list(agent_responses.keys())[0]: list(agent_responses.values())[0]}
+                    final_resps, debate_resps, is_corr = evaluate(central_agent_response, y)
+                else:
+                    final_resps, debate_resps, is_corr = evaluate(agent_responses, y)
+
+                print("\n\n" + str(messages[0])[:200] + "...\n\n")
+                print(f"ROUND {r} : {final_resps} (answer = {y})")
+
+                if args.data in ['gsm8k']:
+                    round_data = {
+                        'responses': agent_responses,
+                        'final_answers': final_resps,
+                        'final_answer_iscorr': [y_pred == np.round(y, 1) for y_pred in final_resps],
+                        'debate_answer': debate_resps,
+                        'debate_answer_iscorr': is_corr,
+                        'answer': np.round(y, 1),
+                        'persona_configs': [str(c) for c in persona_configs]
+                    }
+                else:
+                    round_data = {
+                        'responses': agent_responses,
+                        'final_answers': final_resps,
+                        'final_answer_iscorr': [y_pred == y for y_pred in final_resps],
+                        'debate_answer': debate_resps,
+                        'debate_answer_iscorr': is_corr,
+                        'answer': y,
+                        'persona_configs': [str(c) for c in persona_configs]
+                    }
+
+                rounds_data_dict[str(r)] = round_data
+                round_iscorr.append(is_corr)
+
+            sample_responses.append(rounds_data_dict)
+            iscorr_list.append(round_iscorr)
+
+            # Save
+            history_dir = os.path.join(args.out_dir, "history")
+            os.makedirs(history_dir, exist_ok=True)
+            out_path = os.path.join(history_dir, f"{fname}.jsonl")
+            with open(out_path, "w") as f:
+                for record in sample_responses:
+                    f.write(json.dumps(record, default=convert_numpy) + "\n")
+
+            round_accs = np.array(iscorr_list).mean(0)
+            for i, acc in enumerate(round_accs):
+                print(f'Round {i} Acc.: {acc:.4f}')
+        
+        except Exception as e: 
+            print(f"Error on question {idx}: {e}")
+            history_dir = os.path.join(args.out_dir, "history")
+            error_path = os.path.join(history_dir, f"{fname}_errorlog.jsonl")
+            with open(error_path, "w") as f: 
+                f.write(f"Question {idx}: {e} \n")
+
 
     os.makedirs(args.out_dir, exist_ok=True)
     tsv_path = os.path.join(args.out_dir, f"{fname}.tsv")
@@ -543,8 +554,8 @@ if __name__ == "__main__":
 
     args.timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
-    with open('token', 'r') as f:
-        token = f.read().strip()
-    args.token = token
+    # with open('token', 'r') as f: #for huggingface
+    #     token = f.read().strip() 
+    # args.token = token
 
     main(args)

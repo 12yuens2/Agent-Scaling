@@ -60,12 +60,24 @@ class AzureOpenAIWrapper:
           [{"role": "system"|"user"|"assistant", "content": "..."}, ...]
         """
 
-        resp = self._client.chat.completions.create(
+        if self.model_name=="o3-mini":
+            resp = self._client.chat.completions.create(
             model=self.model_name,
             messages=messages,
-            max_tokens=max_tokens,
+            max_completion_tokens=max_tokens,
             temperature=temperature,
-            top_p=top_p,
+            #top_p=top_p,
             **kwargs,
         )
-        return resp.choices[0].message.content or ""
+            return resp.choices[0].message.content or ""
+
+        else:
+            resp = self._client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                **kwargs,
+            )
+            return resp.choices[0].message.content or ""
