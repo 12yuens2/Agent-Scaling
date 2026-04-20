@@ -10,7 +10,7 @@ AZURE_OPENAI_MODELS = {
     'gpt-4o', 'gpt-4o-mini',
     'o1', 'o3-mini', 'o3', 'o4-mini',
     'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano',
-    'DeepSeek-V3.2', #added by me :3 
+    'Kimi-K2.5', 'DeepSeek-V3.2', 'claude-sonnet-4-6'
 }
 
 # Closed-source models (accessed via OpenAI-compatible API)
@@ -154,10 +154,11 @@ def get_agents(args, peft_path=None):
 
         if model_key in AZURE_OPENAI_MODELS:
             from model.azure_openai import AzureOpenAIWrapper
-            api_key = os.getenv(getattr(args, 'azure_api_key_env', 'API_KEY'), '')
+            api_key = getattr(args, 'azure_api_key_env', 'API_KEY')
             if not getattr(args, 'azure_endpoint', ''):
                 raise ValueError("azure_endpoint is empty.")
             if not api_key:
+                print(args)
                 raise ValueError(f"Azure OpenAI API key not found.")
             return AzureOpenAIWrapper(
                 model_name=model_key,

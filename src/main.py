@@ -330,6 +330,8 @@ def main(args):
     sample_responses = []
     iscorr_list = []
     print("Data ",args.data)
+    round_accs = 0
+
     for idx, (x, y) in tqdm(enumerate(zip(test_X, test_Y)), total=len(test_X)):
         print('\n\nQuestion: ', x + SUFFIX, '\n')
 
