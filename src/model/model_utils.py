@@ -10,7 +10,7 @@ AZURE_OPENAI_MODELS = {
     'gpt-4o', 'gpt-4o-mini',
     'o1', 'o3-mini', 'o3', 'o4-mini',
     'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano',
-    'Kimi-K2.5', 'DeepSeek-V3.2'
+    'Kimi-K2.5', 'DeepSeek-V3.2', 'claude-sonnet-4-6'
 }
 
 # Closed-source models (accessed via OpenAI-compatible API)

@@ -59,14 +59,28 @@ class AzureOpenAIWrapper:
         `messages` follows the OpenAI chat format:
           [{"role": "system"|"user"|"assistant", "content": "..."}, ...]
         """
-        print(f"MAX TOKENS:{max_tokens}")
+        MAX_RETRY_TOKENS = 4096
 
-        resp = self._client.chat.completions.create(
-            model=self.model_name,
-            messages=messages,
-            max_completion_tokens=max_tokens,
-            #temperature=temperature,
-            #top_p=top_p,
-            **kwargs,
-        )
+        max_tokens_try = max_tokens
+        while max_tokens_try <= MAX_RETRY_TOKENS:
+            try:
+                resp = self._client.chat.completions.create(
+                    model=self.model_name,
+                    messages=messages,
+                    max_completion_tokens=max_tokens_try,
+                    #temperature=temperature,
+                    #top_p=top_p,
+                    **kwargs,
+                )
+                break
+            except BadRequestError as e:
+                if "Insufficient tokens to fulfill request" in str(e): #not enough tokens
+                    max_tokens_try *= 2
+                    if max_tokens_try > MAX_RETRY_TOKENS:
+                        raise ValueError(
+                            f"Request costs more than token limit at {MAX_RETRY_TOKENS}"
+                        ) from e
+                else:
+                    raise
+
         return resp.choices[0].message.content or ""
