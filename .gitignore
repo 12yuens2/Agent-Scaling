@@ -9,6 +9,11 @@ __pycache__/
 *.npy
 *.tsv
 *.log
+*.swp
 out/
+out-baseline/
 history/
 cache/
+.ipynb_checkpoints/
+
+.DS_STORE
