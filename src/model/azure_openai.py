@@ -1,5 +1,6 @@
 import os
 from typing import Dict, List, Optional
+from openai import BadRequestError
 
 
 class AzureOpenAIWrapper:
@@ -30,6 +31,8 @@ class AzureOpenAIWrapper:
         self.api_key = api_key
         self.api_version = api_version
         self.timeout = timeout
+
+        self.filtered_count = 0
 
         try:
             # openai>=1.0 provides AzureOpenAI
@@ -67,7 +70,7 @@ class AzureOpenAIWrapper:
                 resp = self._client.chat.completions.create(
                     model=self.model_name,
                     messages=messages,
-                    max_completion_tokens=max_tokens_try,
+                    max_tokens=max_tokens_try,
                     #temperature=temperature,
                     #top_p=top_p,
                     **kwargs,
@@ -75,12 +78,18 @@ class AzureOpenAIWrapper:
                 break
             except BadRequestError as e:
                 if "Insufficient tokens to fulfill request" in str(e): #not enough tokens
+                    print("Not enough tokens")
                     max_tokens_try *= 2
                     if max_tokens_try > MAX_RETRY_TOKENS:
-                        raise ValueError(
-                            f"Request costs more than token limit at {MAX_RETRY_TOKENS}"
-                        ) from e
+                        print(f"Request costs more than token limit at {MAX_RETRY_TOKENS}")
+                        return ""
+                elif "The response was filtered" in str(e): #context filtered
+                    self.filtered_count += 1
+                    print(f"Content filtered: {messages}\n{e}\nNumber of times filtered: {self.filtered_count}")
+                    return ""
                 else:
-                    raise
+                    print(f"Error not caught: {e}")
+                    return ""
 
-        return resp.choices[0].message.content or ""
+        return resp
+        #return resp.choices[0].message.content or ""

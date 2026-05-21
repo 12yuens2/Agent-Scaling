@@ -47,6 +47,7 @@ def get_args():
                         help='Baseline A: length-matched neutral padding without persona')
     parser.add_argument('--baseline_b', action='store_true',
                         help='Baseline B: single shared persona for all agents')
+    parser.add_argument('--persona_prompt', action='store_true')
 
     # model
     parser.add_argument('--model', type=str, default="llama3.1")
@@ -293,12 +294,12 @@ def main(args):
     # =========================
     # Setup Names / filenames
     # =========================
-    model_tag = args.model
-    if args.agent_models:
-        uniq = list(dict.fromkeys(agent_model_keys))
-        model_tag = f"MIXED{len(uniq)}"
-
-    fname = f"{args.data}_{args.solver}_{args.data_size}__{model_tag}_N={args.num_agents}_R={args.debate_rounds}"
+    model_tag = args.agent_models
+    #if args.agent_models:
+    #    uniq = list(dict.fromkeys(agent_model_keys))
+    #    model_tag = f"MIXED{len(uniq)}"
+    timestamp = datetime.now().strftime("%d-%m-%Y-%H:%M:%S")
+    fname = f"{timestamp}_{args.data}_{args.solver}_{args.data_size}__{model_tag}_N={args.num_agents}_R={args.debate_rounds}"
     if args.sparse:
         fname += '_SPARSE'
     elif args.centralized:
@@ -307,6 +308,8 @@ def main(args):
         fname += '_BAE'
     if args.multi_persona:
         fname += '_HETERO_ENHANCED'
+    if args.persona_prompt:
+        fname += '_PERSONA_PROMPT'
 
     if getattr(args, "baseline_a", False):
         fname += '_BASEA_LENMATCH'
@@ -409,7 +412,9 @@ def main(args):
         # First round inference - pass persona_configs
         # ============================================================
         responses = engine(messages, agents, args.num_agents, persona_configs=persona_configs)
-        agent_responses = dict(zip(agent_names, responses))
+        response_texts = [resp.choices[0].message.content for resp in responses]
+        responses_json = [resp.model_dump_json() for resp in responses]
+        agent_responses = dict(zip(agent_names, response_texts))
 
         # Verbose: print per-agent generation parameters
         if args.verbose:
@@ -431,7 +436,9 @@ def main(args):
 
         if args.data in ['gsm8k']:
             round_data = {
-                'responses': agent_responses,
+                'messages': messages,
+                'responses': responses_json,
+                'agent_responses': agent_responses,
                 'final_answers': final_resps,
                 'final_answer_iscorr': [y_pred == np.round(y, 1) for y_pred in final_resps],
                 'debate_answer': debate_resps,
@@ -470,7 +477,9 @@ def main(args):
 
             messages = list(new_agent_messages.values())
             responses = engine(messages, agents, args.num_agents, persona_configs=persona_configs)
-            agent_responses = dict(zip(agent_names, responses))
+            response_texts = [resp.choices[0].message.content for resp in responses]
+            responses_json = [resp.model_dump_json() for resp in responses]
+            agent_responses = dict(zip(agent_names, response_texts))
 
             if args.verbose:
                 print(f"\n[Round {r}] Agent generation configs:")
@@ -489,7 +498,9 @@ def main(args):
 
             if args.data in ['gsm8k']:
                 round_data = {
-                    'responses': agent_responses,
+                    'messages': messages,
+                    'responses': responses_json,
+                    'agent_responses': agent_responses,
                     'final_answers': final_resps,
                     'final_answer_iscorr': [y_pred == np.round(y, 1) for y_pred in final_resps],
                     'debate_answer': debate_resps,

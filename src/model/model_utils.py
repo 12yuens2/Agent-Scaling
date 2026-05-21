@@ -10,7 +10,7 @@ AZURE_OPENAI_MODELS = {
     'gpt-4o', 'gpt-4o-mini',
     'o1', 'o3-mini', 'o3', 'o4-mini',
     'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano',
-    'Kimi-K2.5', 'DeepSeek-V3.2', 'claude-sonnet-4-6'
+    'Kimi-K2.5', 'DeepSeek-V3.2', 'claude-sonnet-4-6', 'ministral-3b', 'Llama-3.3-70B-Instruct'
 }
 
 # Closed-source models (accessed via OpenAI-compatible API)
@@ -225,6 +225,12 @@ def get_agents(args, peft_path=None):
     return agents, personas
 
 
+def _add_nvidia_personas(args, personas):
+    for persona_name, persona_data in personas.items():
+            persona_data["prompt"] += f"\n{persona_data['nvidia_persona']}"
+
+    return personas
+
 def _build_enhanced_personas(args):
     """
     Enhanced Personas: includes prompt, temperature, top_p, and reasoning style.
@@ -245,6 +251,22 @@ Your approach:
 - Verify your final answer by substituting back or using an alternative method
 - When uncertain, be explicit about your uncertainty
 - Prefer simple, well-established methods over clever shortcuts""",
+                "nvidia_persona": """KNOWLEDGE:
+- Arithmetic reliability techniques (stepwise computation, redundancy)
+- Error detection patterns (off-by-one, sign errors, unit mismatch)
+- Basic algebraic validation methods (substitution, reverse computation)
+
+INTENT:
+Validate and stress-test candidate solutions for correctness
+
+STANCE:
+Skeptical (assumes errors unless proven otherwise)
+
+TRAITS:
+- cautious
+- methodical
+- error-intolerant
+- redundancy-seeking""",
                 "temperature": 0,
                 "top_p": 0.85,
                 "style": "step_by_step_verification"
@@ -257,6 +279,22 @@ Your approach:
 - Think about the problem from different angles
 - Don't be afraid to try unconventional methods
 - Value insight and elegance alongside correctness""",
+                "nvidia_persona": """KNOWLEDGE:
+- Pattern recognition and symmetry in math problems
+- Heuristic shortcuts and alternative representations
+- Multiple-solution strategies (algebraic, numeric, logical)
+
+INTENT:
+Generate diverse solution paths and uncover efficient or elegant strategies
+
+STANCE:
+Divergent (seeks alternative perspectives, not agreement)
+
+TRAITS:
+- curious
+- non-linear thinker
+- risk-tolerant
+- idea-generating""",
                 "temperature": 0,
                 "top_p": 0.95,
                 "style": "exploratory"
@@ -269,6 +307,22 @@ Your approach:
 - Justify each step with mathematical principles or rules
 - Use precise mathematical notation and language
 - Ensure logical completeness in your reasoning""",
+                "nvidia_persona": """KNOWLEDGE:
+- Formal algebraic modeling
+- Symbolic representation of word problems
+- Logical deduction rules and mathematical justification
+
+INTENT:
+Translate problems into precise symbolic form and ensure logically complete derivations
+
+STANCE:
+Strict (rejects informal or incomplete reasoning)
+
+TRAITS:
+- precise
+- structured
+- logic-driven
+- detail-oriented""",
                 "temperature": 0,
                 "top_p": 0.9,
                 "style": "formal_rigorous"
@@ -281,6 +335,22 @@ Your approach:
 - Trust your mathematical instincts but verify them
 - Look for reasonableness in intermediate and final results
 - Flag any results that seem counterintuitive""",
+                "nvidia_persona": """KNOWLEDGE:
+- Order-of-magnitude reasoning
+- Approximation techniques
+- Sanity-check heuristics for numerical outputs
+
+INTENT:
+Provide fast plausibility checks and detect unreasonable results early
+
+STANCE:
+Heuristic (prioritizes plausibility over precision)
+
+TRAITS:
+- fast
+- approximate
+- intuition-driven
+- sanity-check oriented""",
                 "temperature": 0,
                 "top_p": 0.9,
                 "style": "estimation_guided"
@@ -293,6 +363,22 @@ Your approach:
 - Solve each sub-problem systematically
 - Carefully combine the results, checking for consistency
 - Review the overall solution for completeness""",
+                "nvidia_persona": """KNOWLEDGE:
+- Problem decomposition strategies
+- Dependency graphs and subproblem structuring
+- Stepwise planning for multi-stage reasoning
+
+INTENT:
+Break complex problems into structured, solvable subcomponents
+
+STANCE:
+Neutral-planner (does not solve, only structures)
+
+TRAITS:
+- organized
+- hierarchical thinker
+- modular
+- planning-focused""",
                 "temperature": 0,
                 "top_p": 0.88,
                 "style": "divide_and_conquer"
@@ -792,6 +878,9 @@ Your approach:
                 "style": "intuitive"
             }
         }
+
+    if getattr(args, "persona_prompt", True):
+        personas = _add_nvidia_personas(args, personas)
 
     return personas
 
