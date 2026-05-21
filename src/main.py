@@ -330,13 +330,15 @@ def main(args):
     # =========================
     sample_responses = []
     iscorr_list = []
+    agent_iscorr_list = []
     round_accs = 0
 
     for idx, (x, y) in tqdm(enumerate(zip(test_X, test_Y)), total=len(test_X)):
         print('\n\nQuestion: ', x + SUFFIX, '\n')
 
         print("Gathering initial opinions...")
-        round_iscorr = []
+        round_iscorr = [] # track accuracy per round
+        agent_iscorr = [] # track accuracy per agent
 
         # ============================================================
         # Build initial messages
@@ -435,22 +437,25 @@ def main(args):
         print(f"ROUND 0 : {final_resps} (answer = {y})")
 
         if args.data in ['gsm8k']:
+            final_answer_iscorr = [y_pred == np.round(y, 1) for y_pred in final_resps]
+
             round_data = {
                 'messages': messages,
                 'responses': responses_json,
                 'agent_responses': agent_responses,
                 'final_answers': final_resps,
-                'final_answer_iscorr': [y_pred == np.round(y, 1) for y_pred in final_resps],
+                'final_answer_iscorr': final_answer_iscorr,
                 'debate_answer': debate_resps,
                 'debate_answer_iscorr': is_corr,
                 'answer': np.round(y, 1),
                 'persona_configs': [str(c) for c in persona_configs]
             }
         else:
+            final_answer_iscorr = [y_pred == y for y_pred in final_resps]
             round_data = {
                 'responses': agent_responses,
                 'final_answers': final_resps,
-                'final_answer_iscorr': [y_pred == y for y_pred in final_resps],
+                'final_answer_iscorr': final_answer_iscorr,
                 'debate_answer': debate_resps,
                 'debate_answer_iscorr': is_corr,
                 'answer': y,
@@ -459,6 +464,7 @@ def main(args):
 
         rounds_data_dict = {'0': round_data}
         round_iscorr.append(is_corr)
+        agent_iscorr.append(final_answer_iscorr)
 
         # ============================================================
         # Debate rounds
@@ -497,22 +503,24 @@ def main(args):
             print(f"ROUND {r} : {final_resps} (answer = {y})")
 
             if args.data in ['gsm8k']:
+                final_answer_iscorr = [y_pred == np.round(y, 1) for y_pred in final_resps]
                 round_data = {
                     'messages': messages,
                     'responses': responses_json,
                     'agent_responses': agent_responses,
                     'final_answers': final_resps,
-                    'final_answer_iscorr': [y_pred == np.round(y, 1) for y_pred in final_resps],
+                    'final_answer_iscorr': final_answer_iscorr,
                     'debate_answer': debate_resps,
                     'debate_answer_iscorr': is_corr,
                     'answer': np.round(y, 1),
                     'persona_configs': [str(c) for c in persona_configs]
                 }
             else:
+                final_answer_iscorr = [y_pred == y for y_pred in final_resps]
                 round_data = {
                     'responses': agent_responses,
                     'final_answers': final_resps,
-                    'final_answer_iscorr': [y_pred == y for y_pred in final_resps],
+                    'final_answer_iscorr': final_answer_iscorr,
                     'debate_answer': debate_resps,
                     'debate_answer_iscorr': is_corr,
                     'answer': y,
@@ -521,9 +529,11 @@ def main(args):
 
             rounds_data_dict[str(r)] = round_data
             round_iscorr.append(is_corr)
+            agent_iscorr.append(final_answer_iscorr)
 
         sample_responses.append(rounds_data_dict)
         iscorr_list.append(round_iscorr)
+        agent_iscorr_list.append(agent_iscorr)
 
         # Save
         history_dir = os.path.join(args.out_dir, "history")
@@ -537,11 +547,21 @@ def main(args):
         for i, acc in enumerate(round_accs):
             print(f'Round {i} Acc.: {acc:.4f}')
 
+        agent_accs = np.array(agent_iscorr_list).mean(0)
+        for i, accs in enumerate(agent_accs):
+            format_accs = ", ".join(f"{acc:.2f}" for acc in accs)
+            print(f"Round {i}: [{format_accs}]")
+
     os.makedirs(args.out_dir, exist_ok=True)
     tsv_path = os.path.join(args.out_dir, f"{fname}.tsv")
     with open(tsv_path, "a") as f:
         line = f"\n{args.timestamp}\t{fname}\t{round_accs}"
         f.writelines(line)
+
+        for i, accs in enumerate(agent_accs):
+            format_accs = ", ".join(f"{acc:.2f}" for acc in accs)
+            line = f"\nRound {i}: [{format_accs}]"
+            f.writelines(line)
 
 
 if __name__ == "__main__":

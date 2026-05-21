@@ -28,9 +28,34 @@ def get_instruction_suffix(args):
             return ' Make sure to state your final answer choice in curly brackets at the very end of your response, just like: "{final answer: (A)}".'
 
 
-
+def extract_number(text):
+    matches = re.findall(r"-?\d+\.?\d*", text)
+    if not matches:
+        return ""
+    return float(matches[-1])
 
 def evaluate_gsm8k(responses, answer):
+    final_answers = []
+
+    for _, response in responses.items():
+        try:
+            pred = extract_number(response)
+            final_answers.append(np.round(pred, 1))
+        except:
+            final_answers.append("")
+
+    if len(set(final_answers)) == 1 and list(set(final_answers))[0] == "":
+        debate_answer = ""
+    else:
+        counter = collections.Counter([x for x in final_answers if x != ""])
+        max_count = max(counter.values())
+        most_common = [k for k, v in counter.items() if v == max_count]
+        debate_answer = random.choice(most_common)
+
+    return final_answers, debate_answer, debate_answer == np.round(answer, 1)
+
+
+def _evaluate_gsm8k(responses, answer):
     # Returns True if correct, False if incorrect
     final_answers = []
     for _, response in responses.items():
