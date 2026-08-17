@@ -82,14 +82,15 @@ class AzureOpenAIWrapper:
                     max_tokens_try *= 2
                     if max_tokens_try > MAX_RETRY_TOKENS:
                         print(f"Request costs more than token limit at {MAX_RETRY_TOKENS}")
-                        return ""
+                        #return ""
                 elif "The response was filtered" in str(e): #context filtered
                     self.filtered_count += 1
                     print(f"Content filtered: {messages}\n{e}\nNumber of times filtered: {self.filtered_count}")
-                    return ""
+                    #return ""
                 else:
                     print(f"Error not caught: {e}")
-                    return ""
+                    #return ""
 
+        print(f"Azure OpenAI response: {resp}")
         return resp
         #return resp.choices[0].message.content or ""

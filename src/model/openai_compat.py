@@ -55,6 +55,7 @@ class OpenAICompatChatWrapper:
         top_p: Optional[float] = None,
         **kwargs,
     ) -> str:
+        max_tokens = 4096
         resp = self._client.chat.completions.create(
             model=self.model_name,
             messages=messages,

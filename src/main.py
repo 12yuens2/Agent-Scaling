@@ -13,6 +13,7 @@ from evaluator import (
     get_instruction_suffix,
     evaluate_gsm8k,
     evaluate_mcq,
+    extract_number,
     base_evaluate_gsm8k,
     base_evaluate_mcq,
 )
@@ -39,6 +40,9 @@ def get_args():
     parser.add_argument('--split', type=str, default='train')
     parser.add_argument('--debug', action='store_true')
 
+    # output file extra
+    parser.add_argument('--comment', type=str, default='')
+
     # agent
     parser.add_argument('--num_agents', type=int, default=5)
     parser.add_argument('--agent_selection', type=str, default="none")
@@ -48,6 +52,10 @@ def get_args():
     parser.add_argument('--baseline_b', action='store_true',
                         help='Baseline B: single shared persona for all agents')
     parser.add_argument('--persona_prompt', action='store_true')
+
+    # use chosen agents
+    parser.add_argument('--chosen_agents', action='store_true')
+    parser.add_argument('--chosen_personas', type=str, default="none") # list of agent persona names
 
     # model
     parser.add_argument('--model', type=str, default="llama3.1")
@@ -144,7 +152,9 @@ def get_new_message(args, sample, responses, personas=None, suffix=None, agent_p
                     peers = agents[:i] + agents[i + 1:]
 
                 for other_agent in peers:
-                    msg += f"\n\nOne of the agents' response: \n{responses[other_agent]}\n"
+                    other_answer = extract_number(responses[other_agent]) # if args.data in "gsm8k"
+                    msg += f"\n\nOne of the agents' answer: \n{other_answer}\n"
+
                 msg += f"\n\nThis was your most recent opinion:\n{responses[agents[i]]}\n"
                 msg += f"\n\nUse these opinions carefully as additional advice to revise your recent opinion to give your final answer to the question:\n{sample}"
 
@@ -299,7 +309,7 @@ def main(args):
     #    uniq = list(dict.fromkeys(agent_model_keys))
     #    model_tag = f"MIXED{len(uniq)}"
     timestamp = datetime.now().strftime("%d-%m-%Y-%H:%M:%S")
-    fname = f"{timestamp}_{args.data}_{args.solver}_{args.data_size}__{model_tag}_N={args.num_agents}_R={args.debate_rounds}"
+    fname = f"{args.data}_{args.solver}_{args.data_size}__{model_tag}_N={args.num_agents}_R={args.debate_rounds}"
     if args.sparse:
         fname += '_SPARSE'
     elif args.centralized:
@@ -310,6 +320,8 @@ def main(args):
         fname += '_HETERO_ENHANCED'
     if args.persona_prompt:
         fname += '_PERSONA_PROMPT'
+    if args.chosen_agents:
+        fname += '_CHOSEN'
 
     if getattr(args, "baseline_a", False):
         fname += '_BASEA_LENMATCH'
@@ -552,16 +564,23 @@ def main(args):
             format_accs = ", ".join(f"{acc:.2f}" for acc in accs)
             print(f"Round {i}: [{format_accs}]")
 
+    # final result output
     os.makedirs(args.out_dir, exist_ok=True)
-    tsv_path = os.path.join(args.out_dir, f"{fname}.tsv")
+    tsv_path = os.path.join(args.out_dir, f"{fname}.csv")
     with open(tsv_path, "a") as f:
-        line = f"\n{args.timestamp}\t{fname}\t{round_accs}"
-        f.writelines(line)
+        
+        persona_names = [persona_name for persona_name, _ in personas.items()]
+
+        line = f"\n{args.timestamp},{fname},{args.comment},{round_accs},{','.join(persona_names)},"
+        # f.writelines(line)
+        # f.writelines(f"\n{person a_names}")
 
         for i, accs in enumerate(agent_accs):
             format_accs = ", ".join(f"{acc:.2f}" for acc in accs)
-            line = f"\nRound {i}: [{format_accs}]"
-            f.writelines(line)
+            line += f"{i},"
+            line += f"{format_accs},"
+
+        f.writelines(line)
 
 
 if __name__ == "__main__":

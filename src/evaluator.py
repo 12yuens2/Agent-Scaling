@@ -12,27 +12,38 @@ from datetime import datetime
 
 
 def get_instruction_suffix(args):
-    if args.data in ['gsm8k']:
-        if args.bae :
+    # Safely access attributes on args with defaults to avoid AttributeError
+    data = getattr(args, 'data', None)
+    bae = getattr(args, 'bae', False)
+    cot = getattr(args, 'cot', False)
+
+    if data in ['gsm8k']:
+        if bae:
             return ' Make sure to state your answer at the end of the response.'
-        elif args.cot :
+        elif cot:
             return " Make sure to state your final answer in curly brackets at the very end of your response, just like: '{final answer: 123}'. Let's think step by step."
-        else :
+        else:
             return ' Make sure to state your final answer in curly brackets at the very end of your response, just like: "{final answer: 123}".'
-    elif args.data in ['hellaswag','pro_medicine','formal_logic','arc','truthfulqa','winogrande']:
-        if args.bae :
+    elif data in ['hellaswag','pro_medicine','formal_logic','arc','truthfulqa','winogrande']:
+        if bae:
             return ' Put your final answer in the form (X) at the end of your response.'
-        elif args.cot :
+        elif cot:
             return " Make sure to state your final answer choice in curly brackets at the very end of your response, just like: '{final answer: (A)}'. Let's think step by step."
-        else :
+        else:
             return ' Make sure to state your final answer choice in curly brackets at the very end of your response, just like: "{final answer: (A)}".'
+    else:
+        # Unknown or unspecified data type: return empty suffix (safe default)
+        return ' Make sure to state your final answer in curly brackets at the very end of your response, just like: "{final answer: 123}".'
 
 
 def extract_number(text):
-    matches = re.findall(r"-?\d+\.?\d*", text)
-    if not matches:
+    if text:
+        matches = re.findall(r"-?\d+\.?\d*", text)
+        if not matches:
+            return ""
+        return float(matches[-1])
+    else:
         return ""
-    return float(matches[-1])
 
 def evaluate_gsm8k(responses, answer):
     final_answers = []
